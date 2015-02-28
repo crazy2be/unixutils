@@ -1,0 +1,1 @@
+@cscript /Nologo C:\UnxUtils\bin\ivs.js %*
