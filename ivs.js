@@ -20,6 +20,50 @@ Pp.add = function (piece) { return this.join(new Path(piece)); }
 Pp.toString = function () { return this._parts.join('\\'); }
 Pp.last = function () { return this._parts[this._parts.length - 1]; }
 
+function Chain(arr) {
+	this._arr = arr;
+	this._chain = [];
+}
+var Chp = Chain.prototype;
+Chp.filter = function (cb) {
+	this._chain.push({fn: 'filter', cb: cb}); return this;
+}
+Chp.map = function (cb) {
+	this._chain.push({fn: 'map', cb: cb}); return this;
+}
+function evalNext(item, restChain) {
+	if (!restChain.length) return;
+	var link = restChain[0];
+	if (link.fn === 'filter') {
+		if (link.cb(item)) evalNext(item, restChain.slice(1));
+	} else if (link.fn === 'map') {
+		evalNext(link.cb(item), restChain.slice(1));
+	} else if (link.fn === 'flatMap') {
+		link.cb(item).each(function (item) { evalNext(item, restChain.slice(1)); });
+	} else if (link.fn === 'each') {
+		link.cb(item); // todo: should this be end of iteration?
+	} else {
+		throw "Unrecognized fn " + link.fn;
+	}
+}
+Chp.each = function (cb) {
+	var self = this;
+	this._chain.push({fn: 'each', cb: cb});
+	this._arr.each(function (item) { evalNext(item, self._chain); });
+}
+
+function Cmd(cmdLine) {
+	this._cmdLine = cmdLine;
+}
+var Cmdp = Cmd.prototype;
+Cmdp.each = function (cb) {
+	var cmd = shell.Exec(this._cmdLine);
+	while (!cmd.StdOut.AtEndOfStream) {
+		var line = cmd.StdOut.ReadLine();
+		cb(line);
+	}
+};
+
 function squeaky() {
 	var tortoiseCleanup = "TortoiseProc /command:cleanup /path:.";
 	shell.Exec("TortoiseProc /command:cleanup /path:.");
@@ -27,43 +71,43 @@ function squeaky() {
 function writeLine(line) {
 	if (line[line.length - 1] != "\n") WScript.StdOut.Write(line + "\n");
 }
+function /*filter*/blankLines(line) {
+	// http://stackoverflow.com/questions/1418050/string-strip-for-javascript
+	return line.replace(/^\s+|\s+$/g, '').length > 0;
+}
 function update() {
-	var svn = shell.Exec("svn update");
 	var externalLine = "";
-	while (!svn.StdOut.AtEndOfStream) {
-		var line = svn.StdOut.ReadLine();
-		if (line.length === 0) {
-			continue;
-		} else if (line.indexOf("Fetching external item into '") === 0) {
-			assert(!externalLine); externalLine = line;
-		} else if (externalLine && line.indexOf("External at revision") === 0) {
-			assert(externalLine); externalLine = "";
-		} else {
-			if (externalLine) {
-				writeLine(externalLine); externalLine = "";
+	new Chain(new Cmd("svn update"))
+		.filter(blankLines)
+		.each(function (line) {
+			if (line.indexOf("Fetching external item into '") === 0) {
+				assert(!externalLine); externalLine = line;
+			} else if (externalLine && line.indexOf("External at revision") === 0) {
+				assert(externalLine); externalLine = "";
+			} else {
+				if (externalLine) {
+					writeLine(externalLine); externalLine = "";
+				}
+				writeLine(line);
 			}
-			writeLine(line);
-		}
-	}
-	WScript.StdOut.Write(shell.Exec("src\\post-update.bat").StdOut.ReadAll());
+		});
+	new Chain(new Cmd("src\\post-update.bat")).filter(blankLines).each(writeLine);
 }
 function status() {
-	var svn = shell.Exec("svn status");
 	var externals = {};
-	while (!svn.StdOut.AtEndOfStream) {
-		var line = svn.StdOut.ReadLine();
-		if (line.length === 0) {
-			continue;
-		} else if (line.indexOf("X") === 0) {
+	new Chain(new Cmd("svn status")).filter(blankLines).filter(function (line) {
+		if (line.indexOf("X") === 0) {
 			var external = line.split(" ").slice(-1).pop();
 			assert(!externals[external]); externals[external] = true;
+			return false;
 		} else if (line.indexOf("Performing status on external item at '") === 0) {
 			var external = line.split("'")[1];
 			assert(externals[external]); externals[external] = false;
+			return false;
 		} else {
-			writeLine(line);
+			return true;
 		}
-	}
+	}).each(writeLine);
 }
 
 var commands = {status: status, st: status,
@@ -85,6 +129,7 @@ function parseArgs() {
 	var command = args[0];
 	if (!commands[command]) {
 		pl("Unrecognized command", command);
+		
 		WScript.Quit(1);
 	}
 	return function () {
