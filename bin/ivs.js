@@ -1,63 +1,9 @@
-var shell = WScript.CreateObject("WScript.Shell");
-var fs = WScript.CreateObject("Scripting.FileSystemObject");
-function require(path) { fs.OpenTextFile(path, 1).ReadAll(); }
-function pl(/*...*/) {
-	var args = [].slice.apply(arguments), str = '';
-	for (var i = 0; i < args.length; i++) {
-		str += (i > 0 ? ' ' : '') + '"' + args[i] + '"'; }
-	// This throws errors in the GUI version of WSH.
-	try { WScript.StdOut.WriteLine(str); } catch (e) {} }
-function assert(condition) {
-	if (!condition) {
-		throw new Error("Assertion failed!");
-		WScript.Quit(1);}}
-function Path(arg) { if (typeof arg == "string") this.init(arg); else this._parts = arg.slice(); }
-var Pp = Path.prototype;
-Pp.init = function (str) { this._parts = str.split('\\'); }
-Pp.clone = function (str) { return new Path(this._parts); }
-Pp.parent = function () { var p = this.clone(); p._parts.pop(); return p; }
-Pp.join = function (path) { return new Path(this._parts.concat(path._parts)); }
-Pp.add = function (piece) { return this.join(new Path(piece)); }
-Pp.toString = function () { return this._parts.join('\\'); }
-Pp.last = function () { return this._parts[this._parts.length - 1]; }
+function require(path) { return WScript.CreateObject("Scripting.FileSystemObject")
+		.OpenTextFile("C:\\UnxUtils\\js-lib\\" + path + ".js", 1).ReadAll(); }
+		
+eval(require("Globals"));
+var Chain = eval(require("Chain"));
 
-Array.prototype.each = function (cb) { for (var i = 0; i < this.length; i++) cb(this[i], i, this); };
-String.prototype.startsWith = function (s) { return this.indexOf(s) === 0; };
-
-function Chain(arr) {
-	this._arr = arr;
-	this._chain = [];
-}
-var Chp = Chain.prototype;
-Chp.filter = function (cb) {
-	this._chain.push({fn: 'filter', cb: cb}); return this;
-}
-Chp.map = function (cb) {
-	this._chain.push({fn: 'map', cb: cb}); return this;
-}
-Chp.flatMap = function (cb) {
-	this._chain.push({fn: 'flatMap', cb: cb}); return this;
-}
-function evalNext(item, restChain) {
-	if (!restChain.length) return;
-	var link = restChain[0];
-	if (link.fn === 'filter') {
-		if (link.cb(item)) evalNext(item, restChain.slice(1));
-	} else if (link.fn === 'map') {
-		evalNext(link.cb(item), restChain.slice(1));
-	} else if (link.fn === 'flatMap') {
-		link.cb(item).each(function (item) { evalNext(item, restChain.slice(1)); });
-	} else if (link.fn === 'each') {
-		link.cb(item); // todo: should this be end of iteration?
-	} else {
-		throw "Unrecognized fn " + link.fn;
-	}
-}
-Chp.each = function (cb) {
-	var self = this;
-	this._chain.push({fn: 'each', cb: cb});
-	this._arr.each(function (item) { evalNext(item, self._chain); });
-}
 // TODO: Do something special when commands crash!
 function Cmd(cmdLine) {
 	this._cmdLine = cmdLine;
