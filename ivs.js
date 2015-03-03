@@ -20,6 +20,9 @@ Pp.add = function (piece) { return this.join(new Path(piece)); }
 Pp.toString = function () { return this._parts.join('\\'); }
 Pp.last = function () { return this._parts[this._parts.length - 1]; }
 
+Array.prototype.each = function (cb) { for (var i = 0; i < this.length; i++) cb(this[i], i, this); };
+String.prototype.startsWith = function (s) { return this.indexOf(s) === 0; };
+
 function Chain(arr) {
 	this._arr = arr;
 	this._chain = [];
@@ -30,6 +33,9 @@ Chp.filter = function (cb) {
 }
 Chp.map = function (cb) {
 	this._chain.push({fn: 'map', cb: cb}); return this;
+}
+Chp.flatMap = function (cb) {
+	this._chain.push({fn: 'flatMap', cb: cb}); return this;
 }
 function evalNext(item, restChain) {
 	if (!restChain.length) return;
@@ -51,7 +57,7 @@ Chp.each = function (cb) {
 	this._chain.push({fn: 'each', cb: cb});
 	this._arr.each(function (item) { evalNext(item, self._chain); });
 }
-
+// TODO: Do something special when commands crash!
 function Cmd(cmdLine) {
 	this._cmdLine = cmdLine;
 }
@@ -78,29 +84,25 @@ function /*filter*/blankLines(line) {
 function update() {
 	var externalLine = "";
 	new Chain(new Cmd("svn update"))
-		.filter(blankLines)
-		.each(function (line) {
-			if (line.indexOf("Fetching external item into '") === 0) {
-				assert(!externalLine); externalLine = line;
-			} else if (externalLine && line.indexOf("External at revision") === 0) {
-				assert(externalLine); externalLine = "";
-			} else {
-				if (externalLine) {
-					writeLine(externalLine); externalLine = "";
-				}
-				writeLine(line);
-			}
-		});
+		.flatMap(function (line) {
+			if (line.startsWith("Fetching external item into '")) {
+				assert(!externalLine); externalLine = line; return [];
+			} else if (line.startsWith("External at revision")) {
+				assert(externalLine); externalLine = ""; return [];
+			} else if (externalLine !== false) {
+				var r = [externalLine, line]; externalLine = false; return r;
+			} else return [line];
+		}).filter(blankLines).each(writeLine);
 	new Chain(new Cmd("src\\post-update.bat")).filter(blankLines).each(writeLine);
 }
 function status() {
 	var externals = {};
 	new Chain(new Cmd("svn status")).filter(blankLines).filter(function (line) {
-		if (line.indexOf("X") === 0) {
+		if (line.startsWith("X")) {
 			var external = line.split(" ").slice(-1).pop();
 			assert(!externals[external]); externals[external] = true;
 			return false;
-		} else if (line.indexOf("Performing status on external item at '") === 0) {
+		} else if (line.startsWith("Performing status on external item at '")) {
 			var external = line.split("'")[1];
 			assert(externals[external]); externals[external] = false;
 			return false;
@@ -123,14 +125,13 @@ function parseArgs() {
 	}
 	var args = toArray(WScript.Arguments);
 	if (args.length < 1) {
-		pl("Usage: ivs [status]");
+		pl("Usage: ivs [command]");
 		WScript.Quit(1);
 	}
 	var command = args[0];
 	if (!commands[command]) {
-		pl("Unrecognized command", command);
-		
-		WScript.Quit(1);
+		new Chain(new Cmd('svn ' + args.join(' '))).each(writeLine);
+		WScript.Quit(0);
 	}
 	return function () {
 		commands[command](args.slice(1));
