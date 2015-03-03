@@ -1,5 +1,6 @@
 var shell = WScript.CreateObject("WScript.Shell");
 var fs = WScript.CreateObject("Scripting.FileSystemObject");
+function require(path) { fs.OpenTextFile(path, 1).ReadAll(); }
 function pl(/*...*/) {
 	var args = [].slice.apply(arguments), str = '';
 	for (var i = 0; i < args.length; i++) {
