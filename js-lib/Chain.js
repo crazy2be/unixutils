@@ -33,5 +33,13 @@ Chp.each = function (cb) {
 	this._chain.push({fn: 'each', cb: cb});
 	this._arr.each(function (item) { evalNext(item, self._chain); });
 }
+Chp.value = function () {
+	var arr = [];
+	this.each(function (item) {
+		arr.push(item);
+	});
+	return arr;
+}
+Chp.toString = function () { return "[Chain Object]"; }
 return Chain;
 })();

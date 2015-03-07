@@ -3,6 +3,7 @@ function require(path) { return WScript.CreateObject("Scripting.FileSystemObject
 		
 eval(require("Globals"));
 var Chain = eval(require("Chain"));
+var Path = eval(require("Path"));
 
 // TODO: Do something special when commands crash!
 function Cmd(cmdLine) {
@@ -40,9 +41,19 @@ function update() {
 				var r = [externalLine, line]; externalLine = false; return r;
 			} else return [line];
 		}).filter(blankLines).each(writeLine);
-	new Chain(new Cmd("src\\post-update.bat")).filter(blankLines).each(writeLine);
+	new Chain(new Cmd(Path.findSvnRoot().add("src").add("post-update.bat"))).filter(blankLines).each(writeLine);
 }
 function status() {
+	// Print the branch if it's different than dev.
+	var root = Path.findSvnRoot();
+	var cur = Path.currentDirectory();
+	var relativeUrl = new Path(new Chain(new Cmd("svn info"))
+		.filter(function (line) { return line.startsWith("Relative"); })
+		.map(function (line) { return line.split(":")[1].trim(); })
+		.value()[0]);
+	var branch = relativeUrl.removeSuffix(cur.removePrefix(root));
+	if (branch != "^\\intents\\branches\\dev") writeLine("On branch '" + branch + "'");
+	
 	var externals = {};
 	new Chain(new Cmd("svn status")).filter(blankLines).filter(function (line) {
 		if (line.startsWith("X")) {
@@ -58,10 +69,23 @@ function status() {
 		}
 	}).each(writeLine);
 }
+function diff() {
+	new Chain(new Cmd("svn diff")).each(writeLine);
+	//new Chain(new Cmd("svn diff | cat")).each(writeLine);
+}
+function commit() {
+	shell.Exec("TortoiseProc /command:commit");
+}
+function browse() {
+	shell.Exec("TortoiseProc /command:repobrowser");
+}
 
 var commands = {status: status, st: status,
 	squeaky: squeaky, sq: squeaky,
-	update: update, up: update};
+	update: update, up: update,
+	diff: diff, d: diff,
+	commit: commit, ci: commit,
+	browse: browse, bo: browse};
 function parseArgs() {
 	function toArray(wsArgs) {
 		var args = [];
