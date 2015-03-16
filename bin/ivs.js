@@ -5,30 +5,18 @@ eval(require("Globals"));
 var Chain = eval(require("Chain"));
 var Path = eval(require("Path"));
 
-// TODO: Do something special when commands crash!
-function Cmd(cmdLine) {
-	this._cmdLine = cmdLine;
-}
+function Cmd(cmdLine) { this._cmdLine = cmdLine; }
 var Cmdp = Cmd.prototype;
 Cmdp.each = function (cb) {
 	var cmd = shell.Exec(this._cmdLine);
-	while (!cmd.StdOut.AtEndOfStream) {
-		var line = cmd.StdOut.ReadLine();
-		cb(line);
-	}
+	while (!cmd.StdOut.AtEndOfStream) cb(cmd.StdOut.ReadLine());
+	while (!cmd.StdErr.AtEndOfStream) writeLine('stderr: ' + cmd.StdErr.ReadLine());
+	if (cmd.ExitCode !== 0) writeLine('Exit code: ' + cmd.ExitCode);
 };
 
-function squeaky() {
-	var tortoiseCleanup = "TortoiseProc /command:cleanup /path:.";
-	shell.Exec("TortoiseProc /command:cleanup /path:.");
-}
-function writeLine(line) {
-	if (line[line.length - 1] != "\n") WScript.StdOut.Write(line + "\n");
-}
-function /*filter*/blankLines(line) {
-	// http://stackoverflow.com/questions/1418050/string-strip-for-javascript
-	return line.replace(/^\s+|\s+$/g, '').length > 0;
-}
+function writeLine(line) { WScript.StdOut.Write(line + "\n"); }
+function /*filter*/blankLines(line) { return line.trim().length > 0; }
+
 function update() {
 	var externalLine = "";
 	new Chain(new Cmd("svn update"))
@@ -41,7 +29,8 @@ function update() {
 				var r = [externalLine, line]; externalLine = false; return r;
 			} else return [line];
 		}).filter(blankLines).each(writeLine);
-	new Chain(new Cmd(Path.findSvnRoot().add("src").add("post-update.bat"))).filter(blankLines).each(writeLine);
+	new Chain(new Cmd(Path.findSvnRoot().add("src").add("post-update.bat")))
+		.filter(blankLines).each(writeLine);
 }
 function status() {
 	// Print the branch if it's different than dev.
@@ -73,12 +62,9 @@ function diff() {
 	new Chain(new Cmd("svn diff")).each(writeLine);
 	//new Chain(new Cmd("svn diff | cat")).each(writeLine);
 }
-function commit() {
-	shell.Exec("TortoiseProc /command:commit");
-}
-function browse() {
-	shell.Exec("TortoiseProc /command:repobrowser");
-}
+function commit() { shell.Exec("TortoiseProc /command:commit"); }
+function browse() { shell.Exec("TortoiseProc /command:repobrowser"); }
+function squeaky() { shell.Exec("TortoiseProc /command:cleanup /path:."); }
 
 var commands = {status: status, st: status,
 	squeaky: squeaky, sq: squeaky,
@@ -99,13 +85,17 @@ function parseArgs() {
 		pl("Usage: ivs [command]");
 		WScript.Quit(1);
 	}
-	var command = args[0];
-	if (!commands[command]) {
-		new Chain(new Cmd('svn ' + args.join(' '))).each(writeLine);
-		WScript.Quit(0);
-	}
-	return function () {
-		commands[command](args.slice(1));
+	var commandName = args[0];
+	var command = commands[commandName];
+	return function () {		
+		if (typeof command === 'undefined') {
+			new Chain(new Cmd('svn ' + args.join(' '))).each(writeLine);
+		} else if (typeof command === 'function') {
+			commands[commandName](args.slice(1));
+		} else {
+			throw "Internal error with commandName '" + commandName
+				+ "', value '" + command.toString + "'";
+		}
 	}
 }
 parseArgs()();

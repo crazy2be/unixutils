@@ -45,8 +45,18 @@ Pp.removeSuffix = function (suf) {
 	}
 	return new Path(this._parts.slice(0, di));
 }
+Pp.folder = function () { return new Path(fs.GetParentFolderName(this.toString())); };
+Pp.basename = function () { return fs.GetBaseName(this.toString()); };
 Pp.fileExists = function () { return fs.FileExists(this.toString()); };
 Pp.folderExists = function () { return fs.FolderExists(this.toString()); };
+Pp.files = function () { var self = this;
+	return new Chain({each: function (cb) {
+		var files = fs.GetFolder(self.toString() + '\\').Files;
+		var enumerator = new Enumerator(files);
+		for (; !enumerator.atEnd(); enumerator.moveNext()) {
+			var file = enumerator.item();
+			cb(file);
+}}});}
 
 return Path;
 })();

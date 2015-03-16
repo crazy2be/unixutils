@@ -15,5 +15,6 @@ function assert(condition, message) {
 
 Array.prototype.each = function (cb) { for (var i = 0; i < this.length; i++) cb(this[i], i, this); };
 String.prototype.startsWith = function (s) { return this.indexOf(s) === 0; };
+String.prototype.endsWith = function (s) { return this.lastIndexOf(s) === this.length - s.length; };
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/Trim
 String.prototype.trim = function () { return this.replace(/^[\s\uFEFF\xA0]+|[\s\uFEFF\xA0]+$/g, '') };
