@@ -62,7 +62,7 @@ function diff() {
 	new Chain(new Cmd("svn diff")).each(writeLine);
 	//new Chain(new Cmd("svn diff | cat")).each(writeLine);
 }
-function commit() { shell.Exec("TortoiseProc /command:commit"); }
+function commit() { shell.Exec("TortoiseProc /command:commit /path:."); }
 function browse() { shell.Exec("TortoiseProc /command:repobrowser"); }
 function squeaky() { shell.Exec("TortoiseProc /command:cleanup /path:."); }
 
