@@ -14,7 +14,7 @@ Cmdp.each = function (cb) {
 	if (cmd.ExitCode !== 0) writeLine('Exit code: ' + cmd.ExitCode);
 };
 
-function writeLine(line) { WScript.StdOut.Write(line + "\n"); }
+function writeLine(line) { WScript.StdOut.Write(line + "\r\n"); }
 function /*filter*/blankLines(line) { return line.trim().length > 0; }
 
 function update() {
@@ -58,10 +58,17 @@ function status() {
 		}
 	}).each(writeLine);
 }
-function diff() {
-	new Chain(new Cmd("svn diff")).each(writeLine);
+function diff(args) {
+	new Chain(new Cmd("svn diff " + args.map(function (arg) {return '"' + arg + '"';}).join(" "))).each(writeLine);
 	//new Chain(new Cmd("svn diff | cat")).each(writeLine);
 }
+function run2(str) {
+	pl(str);
+	shell.Exec(str);
+}
+function diff2(args) { run2("TortoiseProc /command:createpatch /path:" + Path.findSvnRoot() + " /savepath:" + Path(args[0]).absolute() + " /noview")}
+function diffnw() { new Chain(new Cmd("svn diff -x --ignore-eol-style")).each(writeLine); }
+function patch2(args) { run2("TortoiseMerge /diff:" + Path.currentDirectory().add(args[0]) + " /patchpath:" + Path.findSvnRoot());}
 function commit() { shell.Exec("TortoiseProc /command:commit /path:."); }
 function browse() { shell.Exec("TortoiseProc /command:repobrowser"); }
 function squeaky() { shell.Exec("TortoiseProc /command:cleanup /path:."); }
@@ -70,6 +77,9 @@ var commands = {status: status, st: status,
 	squeaky: squeaky, sq: squeaky,
 	update: update, up: update,
 	diff: diff, d: diff,
+	diffnw: diffnw, dw: diffnw,
+	diff2: diff2,
+	patch2: patch2,
 	commit: commit, ci: commit,
 	browse: browse, bo: browse};
 function parseArgs() {

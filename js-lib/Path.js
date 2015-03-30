@@ -1,5 +1,6 @@
 (function () {
 function Path(arg) {
+	if (!(this instanceof Path)) return new Path(arg);
 	if (typeof arg == "string") this._parts = arg.split(/\\|\//g);
 	else this._parts = arg.slice();
 }
@@ -47,6 +48,7 @@ Pp.removeSuffix = function (suf) {
 }
 Pp.folder = function () { return new Path(fs.GetParentFolderName(this.toString())); };
 Pp.basename = function () { return fs.GetBaseName(this.toString()); };
+Pp.absolute = function () { return fs.GetAbsolutePathName(this.toString()); }
 Pp.fileExists = function () { return fs.FileExists(this.toString()); };
 Pp.folderExists = function () { return fs.FolderExists(this.toString()); };
 Pp.files = function () { var self = this;

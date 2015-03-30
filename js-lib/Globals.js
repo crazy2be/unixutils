@@ -14,6 +14,7 @@ function assert(condition, message) {
 		WScript.Quit(1);}}
 
 Array.prototype.each = function (cb) { for (var i = 0; i < this.length; i++) cb(this[i], i, this); };
+Array.prototype.map = function (cb) { var a = []; for (var i = 0; i < this.length; i++) a[i] = cb(this[i], i, this); return a; };
 String.prototype.startsWith = function (s) { return this.indexOf(s) === 0; };
 String.prototype.endsWith = function (s) { return this.lastIndexOf(s) === this.length - s.length; };
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/Trim
